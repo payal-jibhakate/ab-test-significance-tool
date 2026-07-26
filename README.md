@@ -1,4 +1,5 @@
 # 📊 A/B Test Statistical Significance Tool
+🔗 **[Try the live app](https://ab-test-significance-tool.streamlit.app)**
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue?logo=python)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-red?logo=streamlit)
