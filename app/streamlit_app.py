@@ -4,22 +4,28 @@ from scipy import stats
 import math
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="A/B Test Significance Tool", layout="centered")
+st.set_page_config(page_title="A/B Test Significance Tool", layout="centered", page_icon="📊")
 
-st.title("A/B Test Statistical Significance Tool")
+st.title("📊 A/B Test Statistical Significance Tool")
 st.write("Upload your A/B test data to check if the difference between groups is statistically significant.")
 
-uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+# ---------- SIDEBAR: all inputs live here ----------
+with st.sidebar:
+    st.header("Configuration")
+    uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
 
-if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
-    st.write("Preview of your data:")
+    df = None
+    group_col = metric_col = None
+
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        group_col = st.selectbox("Group column", df.columns)
+        metric_col = st.selectbox("Metric column", df.columns)
+
+# ---------- MAIN AREA: preview + results ----------
+if df is not None:
+    st.subheader("Data Preview")
     st.dataframe(df.head())
-
-    st.subheader("Configure Your Test")
-
-    group_col = st.selectbox("Which column identifies the groups (e.g. Control/Test)?", df.columns)
-    metric_col = st.selectbox("Which column is the metric you want to compare (e.g. purchases)?", df.columns)
 
     groups = df[group_col].unique()
 
@@ -32,14 +38,12 @@ if uploaded_file is not None:
 
         st.success(f"Comparing **{group_a_name}** vs **{group_b_name}** on **{metric_col}**")
 
-        if st.button("Run Significance Test"):
+        if st.button("Run Significance Test", type="primary"):
 
-            # Step 1: Check normality
             shapiro_a = stats.shapiro(group_a)
             shapiro_b = stats.shapiro(group_b)
             both_normal = shapiro_a.pvalue > 0.05 and shapiro_b.pvalue > 0.05
 
-            # Step 2: Pick the right test based on normality
             if both_normal:
                 test_name = "Independent T-Test"
                 stat, p_value = stats.ttest_ind(group_a, group_b)
@@ -47,26 +51,39 @@ if uploaded_file is not None:
                 test_name = "Mann-Whitney U Test"
                 stat, p_value = stats.mannwhitneyu(group_a, group_b, alternative='two-sided')
 
-            # Step 3: Effect size (Cohen's d)
             n1, n2 = len(group_a), len(group_b)
             pooled_std = math.sqrt(((n1-1)*group_a.std(ddof=1)**2 + (n2-1)*group_b.std(ddof=1)**2) / (n1+n2-2))
             cohens_d = (group_a.mean() - group_b.mean()) / pooled_std
 
+            st.divider()
             st.subheader("Results")
             col1, col2, col3 = st.columns(3)
             col1.metric("Test Used", test_name)
             col2.metric("p-value", f"{p_value:.4f}")
             col3.metric("Effect Size (d)", f"{cohens_d:.4f}")
 
-            # Step 4: Boxplot visual
             st.subheader("Distribution Comparison")
             fig, ax = plt.subplots(figsize=(6, 4))
-            ax.boxplot([group_a, group_b], tick_labels=[str(group_a_name), str(group_b_name)])
-            ax.set_ylabel(metric_col)
-            ax.set_title(f"{metric_col} by group")
+            fig.patch.set_facecolor("#1E2530")
+            ax.set_facecolor("#1E2530")
+
+            box = ax.boxplot([group_a, group_b], tick_labels=[str(group_a_name), str(group_b_name)],
+                              patch_artist=True)
+            for patch in box['boxes']:
+                patch.set_facecolor("#2DD4BF")
+                patch.set_alpha(0.6)
+            for element in ['whiskers', 'fliers', 'means', 'medians', 'caps']:
+                plt.setp(box[element], color="#FAFAFA")
+
+            ax.set_ylabel(metric_col, color="#FAFAFA")
+            ax.set_title(f"{metric_col} by group", color="#FAFAFA")
+            ax.tick_params(colors="#FAFAFA")
+            for spine in ax.spines.values():
+                spine.set_color("#FAFAFA")
+
             st.pyplot(fig)
 
-            # Step 5: Plain-English verdict
+            st.divider()
             st.subheader("Verdict")
             if p_value < 0.05:
                 st.success(
@@ -91,3 +108,5 @@ if uploaded_file is not None:
             else:
                 effect_desc = "large"
             st.caption(f"Effect size interpretation: **{effect_desc}** (|d| = {abs_d:.3f})")
+else:
+    st.info("👈 Upload a CSV file in the sidebar to get started.")
